@@ -9,17 +9,16 @@
 #include "shader.h"
 
 
-
+//Declaring functions before they are implemented later within the program
 void framebuffer_size_callback(GLFWwindow* window, int width, int height);
 void processInput(GLFWwindow *window);
 
-// settings
+//Inital screen size variables that are used
 const unsigned int SCR_WIDTH = 800;
 const unsigned int SCR_HEIGHT = 600;
 
-
+//Custom theme for ImGui
 void theme(){
-    //auto& style = ImGui::GetStyle();
     ImGuiIO& io = ImGui::GetIO();
     ImVec4* colors = ImGui::GetStyle().Colors;
 
@@ -39,59 +38,60 @@ void theme(){
     colors[ImGuiCol_SliderGrab] = ImVec4(1.0f, 1.0f, 1.0f, 0.8f);
 }
 
-int main()
-{
+int main(){
     std::cout << "MainCalled" << std::endl;
-    // glfw: initialize and configure
-    // ------------------------------
+
+
+    //GLFW INITIALIZE
     glfwInit();
-
-    //glfw --> way to uncap frameRate (need to figure out deltaTime)
-    //glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_FALSE);
-
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    #ifdef __APPLE__
+        glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+    #endif
 
-#ifdef __APPLE__
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-#endif
-
-    // glfw window creation
-    // --------------------
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "LearnOpenGL", NULL, NULL);
-    if (window == NULL)
-    {
+    //Basic window intialization for GLFW from OpenGL tutorial resources
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Shader Enginge", NULL, NULL);
+    if (window == NULL){
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
     }
+
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
 
-    // glad: load all OpenGL function pointers
-    // ---------------------------------------
-    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
-    {
+    if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)){
         std::cout << "Failed to initialize GLAD" << std::endl;
         return -1;
     }
 
+
+    //Using my shader script the loads the shader program for openGL to use
+    //The basicShader function is called with the shader file location
     std::cout << "initShaderMain" << std::endl;
     shader basicShader("Fbm.shader");
+
+    //glUseProgram is called to initalize the shader within OpenGL so it can be used within the render method
+    //This could be done within the render loop as well, but i am initializing the shader above to save resources as i do not need to change shader during runtime
     glUseProgram(basicShader.shaderProgram);
 
     
 
-    // set up vertex data (and buffer(s)) and configure vertex attributes
-    // ------------------------------------------------------------------
+    //Vertex buffer is used to define the vertices within the triangle, there are four vertices because i will be creating a mesh of a square
+    //Third point is the Z axis i am not using the Z axis so i have left it at zero
     float vertices[] = {
-        1.0f,  1.0f, 0.0f,  // top right
-        1.0f, -1.0f, 0.0f,  // bottom right
-        -1.0f, -1.0f, 0.0f,  // bottom left
-        -1.0f,  1.0f, 0.0f   // top left 
+        1.0f,  1.0f, 0.0f,
+        1.0f, -1.0f, 0.0f,
+        -1.0f, -1.0f, 0.0f,
+        -1.0f,  1.0f, 0.0f
     };
-    unsigned int indices[] = {  // note that we start from 0!
+
+    //Unsigned int is used because indices cannot be above -1
+    //Indices are used to share vertices, to stop two triangles and 6 vertices from being created to make the square
+    //Instead two triangles and 4 vertices are used, vertices 1 and 3 are shared by both triangles
+    unsigned int indices[] = {
         0, 1, 3,   // first triangle
         1, 2, 3    // second triangle
     }; 
@@ -100,36 +100,34 @@ int main()
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
     glGenBuffers(1, &EBO);
-    // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
     glBindVertexArray(VAO);
 
+    //Vertex buffer is allocated for storage
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
+    //Shared vertices link information is allocated for storage
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW); 
 
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
-
-    // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
     glBindBuffer(GL_ARRAY_BUFFER, 0); 
-
-    // You can unbind the VAO afterwards so other VAO calls won't accidentally modify this VAO, but this rarely happens. Modifying other
-    // VAOs requires a call to glBindVertexArray anyways so we generally don't unbind VAOs (nor VBOs) when it's not directly necessary.
     glBindVertexArray(0); 
 
-
-    // uncomment this call to draw in wireframe polygons.
+    //This is used to show the wireframe of the mesh, this command fills in the triangles and displays the material on both sides
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-    float time = 0.0;
-    float timeAdd = 0.01;
+
+    //Time is the starting time for the shader, timeAdd changes how quickly the shader moves
+    unsigned float time = 0.0;
+    unsigned float timeAdd = 0.01;
 
     //Setup IMGUI
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui::StyleColorsDark();
 
+    //Me setting up the theme and variables i am going to use with ImGui
     ImGui_ImplOpenGL3_Init((char *)glGetString(GL_NUM_SHADING_LANGUAGE_VERSIONS));
     ImVec4 BaseColour;
     ImVec4 StreakColour;
@@ -139,25 +137,27 @@ int main()
     ImVec4 Colour4;
     theme();
 
-    // render loop
-    // -----------
-    while (!glfwWindowShouldClose(window))
-    {
+    //Render loop
+    while (!glfwWindowShouldClose(window)){
+
+        //Updating graphical inputs each frame through the render loop
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
-        // Feed inputs to dear imgui, start new frame
         ImGui::NewFrame();
         
+        //Setup for ImGui, showing FPS and displaying title of context
         auto windowWidth = ImGui::GetWindowSize().x;
-        auto textWidth   = ImGui::CalcTextSize("Debug Menu For Shader Uniforms").x;
+        auto textWidth = ImGui::CalcTextSize("Debug Menu For Shader Uniforms").x;
         ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
         ImGui::Text("Debug Menu For Shader Uniforms");
-        textWidth   = ImGui::CalcTextSize("Application average %.3f ms/frame (%.1f FPS)").x;
+        textWidth = ImGui::CalcTextSize("Application average %.3f ms/frame (%.1f FPS)").x;
         ImGui::SetCursorPosX((windowWidth - textWidth) * 0.5f);
         ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
         ImGui::Dummy(ImVec2(0.0f, 5.0f));
         ImGui::DragFloat("TimeScale", &timeAdd, 0.005f, -10.0f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
         ImGui::Dummy(ImVec2(0.0f, 5.0f));
+
+        //Uniform variables exposed to ImGui controls
         ImGui::ColorEdit3("BaseColour", (float*)&BaseColour);
         ImGui::ColorEdit3("StreakColour", (float*)&StreakColour);
         ImGui::ColorEdit3("Col1", (float*)&Colour1);
@@ -166,17 +166,15 @@ int main()
         ImGui::ColorEdit3("Col4", (float*)&Colour4);
         
 
-        // Render dear imgui into screen
+        //Process to render ImGui to the screen after all updates to the frame are called
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
 
-        // input
-        // -----
+        //Recieving input using a function that calls glfw key commands
         processInput(window);
 
-        // render
-        // ------
+        //Render to the screen, update the shader uniforms with implemented variables that are changed above with ImGui
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
 
@@ -207,55 +205,43 @@ int main()
         int Col4 = glGetUniformLocation(basicShader.shaderProgram, "ColourFour");
         glUniform3f(Col4, Colour4.x, Colour4.y, Colour4.z);
 
-
+        //Speed increase to the shader
         time += timeAdd;
 
-        // draw our first triangle
-        glBindVertexArray(VAO); // seeing as we only have a single VAO there's no need to bind it every time, but we'll do so to keep things a bit more organized
+        // drawing the square using the stored vertex information
+        glBindVertexArray(VAO);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-        // glBindVertexArray(0); // no need to unbind it every time 
 
+        //Update the ImGui method, after all edits are completed
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
+        //Glfw check for key events at the end of render loop
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // optional: de-allocate all resources once they've outlived their purpose:
-    // ------------------------------------------------------------------------
+    //This is used at the end to clear unused memory once render loop is completed
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);
     glDeleteProgram(basicShader.shaderProgram);
-
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
-
-
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
     glfwTerminate();
+
     return 0;
 }
 
 // process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
-void processInput(GLFWwindow *window)
-{
+void processInput(GLFWwindow *window){
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
 }
 
 // glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
-void framebuffer_size_callback(GLFWwindow* window, int width, int height)
-{
-    // make sure the viewport matches the new window dimensions; note that width and 
-    // height will be significantly larger than specified on retina displays.
+void framebuffer_size_callback(GLFWwindow* window, int width, int height){
     glViewport(0, 0, width, height);
 }
 
